@@ -3,7 +3,7 @@
 #include "S05_TestingGrounds.h"
 #include "ChooseNextWayPoint.h"
 #include "AIController.h"
-#include "PatrollingGuard.h"
+#include "PatrolRoute.h"
 #include "BehaviorTree/BlackboardComponent.h"
 
 
@@ -20,23 +20,33 @@ EBTNodeResult::Type UChooseNextWayPoint::ExecuteTask(UBehaviorTreeComponent& Own
 
 	//Get the PatrolPoints
 	auto ControlledPawn = OwnerComp.GetAIOwner()->GetPawn();
-	auto PatrollingGuard = Cast<APatrollingGuard>(ControlledPawn);
-	auto PatrolPoints = PatrollingGuard->PatrolPointsCpp;
+	auto PatrolRoute = ControlledPawn->FindComponentByClass<UPatrolRoute>();
+
+	if (!ensure(PatrolRoute)) { return EBTNodeResult::Failed; }
+	
+	auto PatrolPoints = PatrolRoute->GetPatrolPoints();
+
+	if (PatrolPoints.Num() == 0) {
+
+		auto name = ControlledPawn->GetName();
+		UE_LOG(LogTemp, Warning, TEXT(" %s is missing PatrolPoints on his PatrolRoute"), *name);
+		return EBTNodeResult::Failed; 
+
+	}
 
 	// Set next Waypoint
+
 	auto BlackboardComponent = OwnerComp.GetBlackboardComponent();
 	auto Index = BlackboardComponent->GetValueAsInt(IndexKey.SelectedKeyName);
-	BlackboardComponent->SetValueAsObject(WaypointKey.SelectedKeyName, PatrolPoints[Index]);
-	
-
+	auto NextWayPoint = PatrolPoints[Index];
+	BlackboardComponent->SetValueAsObject(WaypointKey.SelectedKeyName, NextWayPoint);
 	
 	//CycleWaypointIndex
 	int32 NewIndex = (Index + 1) % PatrolPoints.Num();
 	BlackboardComponent->SetValueAsInt(IndexKey.SelectedKeyName, NewIndex);
-	//TODO Protect against empty patrol route 
 
-	//auto name = AIController->GetPawn()->GetName();
-	//UE_LOG(LogTemp, Warning, TEXT("WaypointIndex = %s"), *name);
+
+	
 	
 
 	return EBTNodeResult::Succeeded;
